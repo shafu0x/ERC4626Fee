@@ -39,12 +39,7 @@ contract ERC4626Fee is ERC4626 {
       address receiver,
       address owner
   ) public override returns (uint256 shares) {
-      uint balancePre = asset.balanceOf(receiver);
-      // Need to transfer before minting or ERC777s could reenter.
-      asset.safeTransferFrom(msg.sender, address(this), assets);
-      uint actualAmount = asset.balanceOf(receiver) - balancePre;
-
-      shares = previewWithdraw(actualAmount); // No need to check for rounding error, previewWithdraw rounds up.
+      shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
       if (msg.sender != owner) {
           uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
@@ -52,13 +47,15 @@ contract ERC4626Fee is ERC4626 {
           if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
       }
 
-      beforeWithdraw(actualAmount, shares);
+      beforeWithdraw(assets, shares);
 
       _burn(owner, shares);
 
-      emit Withdraw(msg.sender, receiver, owner, actualAmount, shares);
+      uint balancePre = asset.balanceOf(receiver);
+      asset.safeTransfer(receiver, assets);
+      uint actualAmount = asset.balanceOf(receiver) - balancePre;
 
-      asset.safeTransfer(receiver, actualAmount);
+      emit Withdraw(msg.sender, receiver, owner, actualAmount, shares);
   }
 
   function redeem(
